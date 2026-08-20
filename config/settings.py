@@ -37,6 +37,8 @@ class AppSettings:
     LAYOUT = "wide"
     INITIAL_SIDEBAR_STATE = "expanded"
 
+    ENV_FILE = os.path.join(BASE_DIR, ".env")
+
     DATA_DIR = os.path.join(BASE_DIR, "data")
     CONVERSATIONS_DIR = os.path.join(DATA_DIR, "conversations")
     LOGS_DIR = os.path.join(BASE_DIR, "logs")
@@ -53,9 +55,9 @@ class AppSettings:
     MAX_RETRIES = _env_int("MAX_RETRIES", 3)
     MAX_AGENT_ITERATIONS = _env_int("MAX_AGENT_ITERATIONS", 5)
 
-    DEFAULT_USER_NAME = "用户"
-    DEFAULT_AI_NAME = "AURA"
-    DEFAULT_PERSONALITY = "理性冷静"
+    DEFAULT_USER_NAME = _env("AURA_USER_NAME", "用户")
+    DEFAULT_AI_NAME = _env("AURA_AI_NAME", "AURA")
+    DEFAULT_PERSONALITY = _env("AURA_PERSONALITY", "理性冷静")
 
     USER_AVATAR = "🧑"
     AI_AVATAR = "🤖"
@@ -69,6 +71,59 @@ class AppSettings:
     def ensure_dirs(cls):
         for d in (cls.CONVERSATIONS_DIR, cls.LOGS_DIR, cls.DB_DIR, cls.KNOWLEDGE_DIR):
             os.makedirs(d, exist_ok=True)
+
+    @classmethod
+    def _upsert_env(cls, updates: dict) -> str:
+        """把多个 KEY=VALUE 写入 .env（存在则更新，不存在则追加）。返回 .env 路径。"""
+        lines: list = []
+        if os.path.exists(cls.ENV_FILE):
+            with open(cls.ENV_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+        remaining = {k: str(v) for k, v in updates.items()}
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            for key, value in list(remaining.items()):
+                if stripped.startswith(f"{key}=") or stripped.startswith(f"{key} ="):
+                    lines[i] = f"{key}={value}\n"
+                    del remaining[key]
+                    break
+
+        if remaining:
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] += "\n"
+            for key, value in remaining.items():
+                lines.append(f"{key}={value}\n")
+
+        with open(cls.ENV_FILE, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+
+        for key, value in updates.items():
+            os.environ[key] = str(value)
+        return cls.ENV_FILE
+
+    @classmethod
+    def save_api_key(cls, api_key: str) -> str:
+        """将 API Key 写入 .env，使其跨会话/重启持久化。返回 .env 路径。"""
+        api_key = (api_key or "").strip()
+        cls._upsert_env({"DEEPSEEK_API_KEY": api_key})
+        cls.DEEPSEEK_API_KEY = api_key
+        return cls.ENV_FILE
+
+    @classmethod
+    def save_preferences(cls, user_name: str, ai_name: str, personality: str, model: str) -> str:
+        """将昵称/AI 名称/性格模式/模型写入 .env，使其跨会话/重启持久化。返回 .env 路径。"""
+        cls._upsert_env({
+            "AURA_USER_NAME": user_name,
+            "AURA_AI_NAME": ai_name,
+            "AURA_PERSONALITY": personality,
+            "DEEPSEEK_MODEL": model,
+        })
+        cls.DEFAULT_USER_NAME = user_name
+        cls.DEFAULT_AI_NAME = ai_name
+        cls.DEFAULT_PERSONALITY = personality
+        cls.DEFAULT_MODEL = model
+        return cls.ENV_FILE
 
 
 class PersonalityConfig:

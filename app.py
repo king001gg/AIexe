@@ -1,7 +1,7 @@
 import streamlit as st
 
 from config.logging_config import setup_logging
-from config.settings import AppSettings
+from config.settings import AppSettings, PersonalityConfig
 from models.conversation import ConversationManager
 from models.memory import get_memory_store
 from services.rag.knowledge_base import get_knowledge_base
@@ -19,11 +19,16 @@ from ui.styles import render_styles
 
 
 def init_session_state():
+    # 性格模式需校验，防止 .env 中配置了无效值导致下拉框崩溃
+    personality = AppSettings.DEFAULT_PERSONALITY
+    if personality not in PersonalityConfig.OPTIONS:
+        personality = PersonalityConfig.OPTIONS[0]
+
     defaults = {
         "current_conv_id": None,
         "user_name": AppSettings.DEFAULT_USER_NAME,
         "ai_name": AppSettings.DEFAULT_AI_NAME,
-        "ai_personality": AppSettings.DEFAULT_PERSONALITY,
+        "ai_personality": personality,
         "deepseek_api_key": AppSettings.DEEPSEEK_API_KEY,
         "deepseek_model": AppSettings.DEFAULT_MODEL,
         "rename_conv_id": None,

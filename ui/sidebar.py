@@ -143,6 +143,17 @@ def _render_settings(current_conv: dict):
         else:
             st.warning("⚠️ 请配置 API Key")
 
+        if st.button(
+            "💾 保存 API Key 到本地",
+            use_container_width=True,
+            help="将密钥写入项目根目录 .env 文件，重启后自动加载（.env 已加入 .gitignore，不会上传）",
+        ):
+            if st.session_state.deepseek_api_key.strip():
+                path = AppSettings.save_api_key(st.session_state.deepseek_api_key)
+                st.success(f"✅ 已保存到 {path}")
+            else:
+                st.warning("⚠️ 请先输入 API Key")
+
     st.markdown('<hr class="gradient-divider">', unsafe_allow_html=True)
 
     st.session_state.user_name = st.text_input("昵称", value=st.session_state.user_name)
@@ -152,6 +163,22 @@ def _render_settings(current_conv: dict):
         PersonalityConfig.OPTIONS,
         index=PersonalityConfig.OPTIONS.index(st.session_state.ai_personality)
     )
+
+    if st.button(
+        "💾 保存偏好设置",
+        use_container_width=True,
+        help="将昵称/AI名称/性格模式/模型写入 .env，重启后自动加载",
+    ):
+        try:
+            path = AppSettings.save_preferences(
+                st.session_state.user_name,
+                st.session_state.ai_name,
+                st.session_state.ai_personality,
+                st.session_state.deepseek_model,
+            )
+            st.success(f"✅ 已保存到 {path}")
+        except Exception as exc:
+            st.error(f"❌ 保存失败：{exc}")
 
     if current_conv:
         current_conv["user_name"] = st.session_state.user_name
